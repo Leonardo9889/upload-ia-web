@@ -4,30 +4,34 @@ import { Textarea } from "./components/ui/textarea";
 import { Label } from "./components/ui/label";
 import { Slider } from "./components/ui/slider";
 import { Select, SelectContent, SelectTrigger, SelectItem, SelectValue } from "./components/ui/select";
-import { FileVideo, Github, Upload, Wand2 } from 'lucide-react'
-import { ChangeEvent, useMemo, useState } from "react";
+import { Github, Wand2 } from 'lucide-react'
+import { VideoInputForm } from "./components/video-input-form";
+import { PromptSelect } from "./components/prompt-select";
+import { useState } from "react";
+import { useCompletion } from "ai/react";
 
 export function App() {
-  const [videoFile, setVideoFile] = useState<File | null>(null)
+  const [ temperature, setTemperature ] = useState(0.5)
+  const [ videoId, setVideoId ] = useState<string | null>(null)
 
-  function handleFileSelected(event: ChangeEvent<HTMLInputElement>){
-    const { files } = event.currentTarget
-  
-    if(!files) {
-      return
+
+  const {
+    input, 
+    setInput,
+    handleInputChange,
+    handleSubmit,
+    completion,
+    isLoading
+  } = useCompletion({
+    api: 'http://localhost:3333/ai/complete',
+    body: {
+      videoId,
+      temperature,
+    },
+    headers: {
+      'Content-type': 'application/json'
     }
-    const selectedFile = files[0]
-
-    setVideoFile(selectedFile)
-  }  
-
-  const previewURL = useMemo(() => {
-    if(!videoFile) {
-      return null
-    }
-
-    return URL.createObjectURL(videoFile)
-  }, [videoFile])
+  })
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -39,9 +43,12 @@ export function App() {
 
          <Separator orientation="vertical" className="h-6"/>
 
+          <a target="_blank" href="https://github.com/Leonardo9889">
           <Button variant="outline">
             <Github className="w-4 h-4 mr-2"/>
-            GitHub</Button>
+            GitHub
+          </Button>
+          </a>
         </div>
       </div>
 
@@ -50,11 +57,14 @@ export function App() {
            <div className="grid grid-row-2 gap-4 flex-1">
               <Textarea
                className="resize-none p-4 leading-relaxed"
-               placeholder="Inclua o prompt para IA..."/>
+               placeholder="Inclua o prompt para IA..."
+               value={input}
+               onChange={handleInputChange}/>
               <Textarea
                className="resize-none p-4 leading-relaxed"
-               placeholder="Reasultado gerado pela IA" 
-               readOnly/>
+               placeholder="Reasultado gerado pela IA...." 
+               readOnly
+               value={completion}/>
            </div>
            <p className="text-sm text-muted-foregroud">
             Lembre-se: você pode utilizar a varável <code className="text-violet-400">{'{transcription}'}</code> no seu prompt para adicionar o conteúdo da transcrição do video selecionado.
@@ -62,50 +72,14 @@ export function App() {
         </div>
 
         <aside className="w-80 space-y-6">
-          <form className="space-y-6">
-            <label htmlFor="video" className="relative border flex rounded-md aspect-video cursor-pointer border-dashed text-sm flex-col gap-2 items-center justify-center text-muted-foreground hover:bg-primary/5">
-              {previewURL ? (
-                <video src={previewURL}/>
-              ) : (
-                <>
-                  <FileVideo/>
-                  Selecione um video
-                </>
-                )}
-            </label>
-
-            <input type="file" id="video" accept="video/mp4" className="sr-only" onChange={handleFileSelected}/>
-
-            <Separator/>
-
-            <div className="space-y-2">
-              <Label htmlFor="transcription_prompt">Prompt de transcrição</Label>
-              <Textarea 
-                id="transcription_prompt" 
-                className="h-20 leading-relaxed resize-none"
-                placeholder="Inclua palavras chave mencionadas no video separadas por virgula ( , )"/>
-              
-              <Button type="submit" className="w-full">
-                Carregar video
-                <Upload className="w-4 h-4 ml-2"/>
-              </Button>
-            </div>
-          </form>
+          <VideoInputForm onVideoUploaded={setVideoId}/>
 
           <Separator/>
 
-          <form className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
               <Label>Prompt</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um prompt..."/>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="title">Título do Youtube</SelectItem>
-                  <SelectItem value="description">Descrição do Youtube</SelectItem>
-                </SelectContent>
-              </Select>
+              <PromptSelect onPromptSelected={setInput}/>
             </div>
 
             <div className="space-y-2">
@@ -133,6 +107,8 @@ export function App() {
                 min={0}
                 max={1}
                 step={0.1}
+                value={[temperature]}
+                onValueChange={value => setTemperature(value[0])}
               />
               <span className=" block text-xs textmuted-forgroud italic landing-relaxed">
                 Valores mais altos tendem a deixar o resultado mais criativo e com possíveis erros.
@@ -141,7 +117,7 @@ export function App() {
 
             <Separator/>
 
-            <Button type="submit" className="w-full">
+            <Button disabled={isLoading} type="submit" className="w-full">
               Executar
               <Wand2 className="w-4 h-4 ml-2"/>
             </Button>
